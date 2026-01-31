@@ -9,7 +9,7 @@ CORS(app)
 def preencher_malote_api():
     dados = request.json
 
-    # >>>>> O PDF em branco é carregado AUTOMATICAMENTE aqui <<<<<
+    # >>> O PDF em branco é carregado AUTOMATICAMENTE aqui <<<
     reader = PdfReader("malote.pdf")
     writer = PdfWriter()
 
