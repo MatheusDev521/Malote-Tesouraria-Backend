@@ -3,7 +3,14 @@ from flask_cors import CORS
 from PyPDF2 import PdfReader, PdfWriter
 
 app = Flask(__name__)
-CORS(app)
+
+# 🔥 PERMITIR SEU FRONTEND DO GITHUB
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://matheusdev521.github.io"]
+    }
+})
+
 
 @app.route("/preencher-malote", methods=["POST"])
 def preencher_malote_api():
