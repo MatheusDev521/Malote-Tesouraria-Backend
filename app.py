@@ -1,6 +1,8 @@
 from flask import Flask, request, send_file
 from flask_cors import CORS
 from PyPDF2 import PdfReader, PdfWriter
+import io
+import os
 
 app = Flask(__name__)
 
@@ -11,13 +13,28 @@ CORS(app, resources={
     }
 })
 
+# ======= ROTA DE TESTE (muito importante para Render) =======
+@app.route("/")
+def home():
+    return "Backend do Malote está ONLINE no Render 🚀"
 
-@app.route("/preencher-malote", methods=["POST"])
+# ======= ROTA PRINCIPAL =======
+@app.route("/preencher-malote", methods=["POST", "OPTIONS"])
 def preencher_malote_api():
+
+    # Permitir preflight do CORS
+    if request.method == "OPTIONS":
+        return "", 204
+
     dados = request.json
 
-    # >>> O PDF em branco é carregado AUTOMATICAMENTE aqui <<<
-    reader = PdfReader("malote.pdf")
+    # 🔹 Caminho seguro do PDF dentro do Render
+    pdf_path = os.path.join(os.path.dirname(__file__), "malote.pdf")
+
+    if not os.path.exists(pdf_path):
+        return {"erro": "Arquivo malote.pdf não encontrado no servidor!"}, 500
+
+    reader = PdfReader(pdf_path)
     writer = PdfWriter()
 
     for page in reader.pages:
@@ -26,16 +43,24 @@ def preencher_malote_api():
     fields = writer.get_fields()
 
     for campo, valor in dados.items():
-        if campo in fields:
+        if fields and campo in fields:
             writer.update_field(campo, valor)
 
     writer.flatten_pages()
 
-    output = "malote_preenchido.pdf"
-    with open(output, "wb") as f:
-        writer.write(f)
+    # 🔹 Gerar PDF em memória (não no disco)
+    output = io.BytesIO()
+    writer.write(output)
+    output.seek(0)
 
-    return send_file(output, as_attachment=True)
+    return send_file(
+        output,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="malote_preenchido.pdf"
+    )
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
+    
+# ======= FIM DO CÓDIGO ======= #
