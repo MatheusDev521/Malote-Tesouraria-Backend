@@ -53,35 +53,43 @@ def preencher_malote_api():
 
         print("✅ PDF encontrado, processando...")
 
+        # 🔹 Ler o PDF original
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
 
+        # 🔹 Copiar todas as páginas
         for page in reader.pages:
             writer.add_page(page)
 
-        # 🔹 Obter campos do PDF
-        fields = writer.get_fields()
-        
-        if fields:
-            print(f"📋 Campos disponíveis no PDF: {list(fields.keys())}")
-        else:
-            print("⚠️ Nenhum campo encontrado no PDF")
+        print(f"📄 PDF tem {len(reader.pages)} página(s)")
 
-        # 🔹 Preencher campos
+        # 🔹 MÉTODO CORRETO PARA PREENCHER CAMPOS NO PYPDF2
         campos_preenchidos = 0
-        for campo, valor in dados.items():
-            if fields and campo in fields:
-                writer.update_page_form_field_values(writer.pages[0], {campo: str(valor)})
-                campos_preenchidos += 1
-                print(f"✏️ Preenchido: {campo} = {valor}")
+        
+        # Para cada página, atualizar os campos
+        for page_num in range(len(writer.pages)):
+            # Criar dicionário com os campos para esta página
+            campos_para_atualizar = {}
+            
+            for campo, valor in dados.items():
+                # Converter valor para string
+                campos_para_atualizar[campo] = str(valor)
+            
+            # Atualizar campos da página
+            writer.update_page_form_field_values(
+                writer.pages[page_num],
+                campos_para_atualizar
+            )
+            campos_preenchidos += len(campos_para_atualizar)
+        
+        print(f"✅ Campos processados: {campos_preenchidos}")
 
-        print(f"✅ Total de campos preenchidos: {campos_preenchidos}")
-
-        # 🔹 Achatar o PDF
+        # 🔹 Achatar o PDF (remover campos editáveis)
         for page in writer.pages:
-            page.compress_content_streams()
             if "/Annots" in page:
-                page["/Annots"] = []
+                del page["/Annots"]
+            if "/AcroForm" in page:
+                del page["/AcroForm"]
 
         # 🔹 Gerar PDF em memória (não no disco)
         output = io.BytesIO()
