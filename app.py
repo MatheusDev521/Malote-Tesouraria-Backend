@@ -1,13 +1,16 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2.generic import NameObject, BooleanObject
 import io
 import os
 import traceback
 
 app = Flask(__name__)
 
-# 🔥 PERMITIR SEU FRONTEND DO GITHUB
+# ===========================
+# CORS (permitindo seu GitHub Pages)
+# ===========================
 CORS(app, resources={
     r"/*": {
         "origins": ["https://matheusdev521.github.io"],
@@ -16,87 +19,85 @@ CORS(app, resources={
     }
 })
 
-# ======= ROTA DE TESTE (muito importante para Render) =======
+# ===========================
+# ROTAS DE TESTE
+# ===========================
 @app.route("/")
 def home():
     return "Backend do Malote está ONLINE no Render 🚀"
 
-# ======= ROTA DE HEALTH CHECK =======
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "message": "Backend funcionando"}), 200
 
-# ======= ROTA PRINCIPAL =======
+# ===========================
+# ROTA PRINCIPAL
+# ===========================
 @app.route("/preencher-malote", methods=["POST", "OPTIONS"])
 def preencher_malote_api():
 
-    # Permitir preflight do CORS
+    # Preflight CORS
     if request.method == "OPTIONS":
         return "", 204
 
     try:
-        # 🔹 Verificar se recebeu dados
+        # Verifica se recebeu JSON
         if not request.json:
             return jsonify({"erro": "Nenhum dado recebido"}), 400
 
         dados = request.json
-        print(f"📥 Dados recebidos: {dados}")
+        print(f"\n📥 DADOS RECEBIDOS DO FRONTEND:\n{dados}\n")
 
-        # 🔹 Caminho seguro do PDF dentro do Render
+        # Caminho do PDF dentro do Render
         pdf_path = os.path.join(os.path.dirname(__file__), "malote.pdf")
         print(f"📂 Procurando PDF em: {pdf_path}")
 
         if not os.path.exists(pdf_path):
-            print(f"❌ PDF não encontrado em: {pdf_path}")
-            print(f"📁 Arquivos no diretório: {os.listdir(os.path.dirname(__file__))}")
+            print("❌ PDF NÃO ENCONTRADO!")
+            print("📁 Arquivos no diretório:", os.listdir(os.path.dirname(__file__)))
             return jsonify({"erro": "Arquivo malote.pdf não encontrado no servidor!"}), 500
 
-        print("✅ PDF encontrado, processando...")
+        print("✅ PDF encontrado!")
 
-        # 🔹 Ler o PDF original
+        # Ler PDF original
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
 
-        # 🔹 Copiar todas as páginas
+        print(f"📄 PDF possui {len(reader.pages)} página(s)")
+
+        # 🔍 Mostrar campos reais do PDF (muito importante)
+        campos_pdf = reader.get_fields()
+        print("\n📋 CAMPOS EXISTENTES NO PDF:")
+        print(campos_pdf)
+        print("\n")
+
+        # Copiar páginas para o writer
         for page in reader.pages:
             writer.add_page(page)
 
-        print(f"📄 PDF tem {len(reader.pages)} página(s)")
+        # 🔹 FORÇAR RENDERIZAÇÃO VISUAL DOS CAMPOS (CORREÇÃO DO BRANCO)
+        writer._root_object.update({
+            NameObject("/NeedAppearances"): BooleanObject(True)
+        })
 
-        # 🔹 MÉTODO CORRETO PARA PREENCHER CAMPOS NO PYPDF2
+        # Preencher campos em todas as páginas
         campos_preenchidos = 0
-        
-        # Para cada página, atualizar os campos
+
         for page_num in range(len(writer.pages)):
-            # Criar dicionário com os campos para esta página
-            campos_para_atualizar = {}
-            
-            for campo, valor in dados.items():
-                # Converter valor para string
-                campos_para_atualizar[campo] = str(valor)
-            
-            # Atualizar campos da página
             writer.update_page_form_field_values(
                 writer.pages[page_num],
-                campos_para_atualizar
+                {campo: str(valor) for campo, valor in dados.items()}
             )
-            campos_preenchidos += len(campos_para_atualizar)
-        
+            campos_preenchidos += len(dados)
+
         print(f"✅ Campos processados: {campos_preenchidos}")
 
-        # 🔹 Achatar o PDF (remover campos editáveis)
-        for page in writer.pages:
-            if "/Annots" in page:
-                del page["/Annots"]
-            if "/AcroForm" in page:
-                del page["/AcroForm"]
-
-        # 🔹 Gerar PDF em memória (não no disco)
+        # Gerar PDF em memória (sem salvar no servidor)
         output = io.BytesIO()
         writer.write(output)
         output.seek(0)
 
-        print("✅ PDF gerado com sucesso!")
+        print("✅ PDF gerado com sucesso e enviado ao frontend!")
 
         return send_file(
             output,
@@ -106,19 +107,18 @@ def preencher_malote_api():
         )
 
     except Exception as e:
-        # 🔥 Capturar e retornar erro detalhado
         erro_detalhado = traceback.format_exc()
-        print(f"❌ ERRO: {str(e)}")
-        print(f"📋 Traceback completo:\n{erro_detalhado}")
-        
+        print("\n❌ ERRO NO BACKEND:")
+        print(erro_detalhado)
+
         return jsonify({
             "erro": str(e),
             "detalhes": erro_detalhado
         }), 500
 
+# ===========================
+# INICIALIZAÇÃO (Render)
+# ===========================
 if __name__ == "__main__":
-    # 🔥 CONFIGURAÇÃO PARA O RENDER
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
-    
-# ======= FIM DO CÓDIGO ======= #
