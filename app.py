@@ -6,7 +6,6 @@ import io, os, traceback
 
 app = Flask(__name__)
 
-
 CORS(app, resources={
     r"/*": {
         "origins": ["https://matheusdev521.github.io"],
@@ -41,21 +40,18 @@ def preencher_malote_api():
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
 
-        # Copiar páginas
         for p in reader.pages:
             writer.add_page(p)
 
-        # 🔥 FORÇAR APARÊNCIA DOS CAMPOS (ESSENCIAL)
+        # Forçar aparência dos campos no PDF
         writer._root_object.update({
             NameObject("/NeedAppearances"): BooleanObject(True)
         })
 
-        # Preencher APENAS uma vez por página
         page = writer.pages[0]
 
-        # Converter checkboxes para formato que o PDF entende
+        # Corrigir formato das checkboxes para o padrão do PDF
         campos_corrigidos = {}
-
         for k, v in dados.items():
             if "Check Box" in k:
                 campos_corrigidos[k] = True if v in ["On", "true", True] else False
