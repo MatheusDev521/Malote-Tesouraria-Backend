@@ -1,202 +1,62 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
-from PyPDF2 import PdfReader, PdfWriter
-import io, os, traceback
+from pypdf import PdfReader, PdfWriter
+import io
+import os
 
 app = Flask(__name__)
+CORS(app)  # Permite requisições do frontend
 
-CORS(app, resources={
-    r"/*": {
-        "origins": ["https://matheusdev521.github.io"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+# Caminho do PDF template
+PDF_TEMPLATE = "malote.pdf"
 
-@app.route("/")
-def home():
-    return "Backend do Malote está ONLINE no Render 🚀"
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Endpoint para verificar se o servidor está rodando"""
+    return jsonify({"status": "online", "message": "Backend funcionando!"}), 200
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok"}), 200
-
-@app.route("/preencher-malote", methods=["POST", "OPTIONS"])
-def preencher_malote_api():
-    if request.method == "OPTIONS":
-        return "", 204
-
+@app.route('/preencher-malote', methods=['POST'])
+def preencher_malote():
     try:
+        # Receber os dados JSON do frontend
         dados = request.json
+        
         if not dados:
             return jsonify({"erro": "Nenhum dado recebido"}), 400
-
-        print("\n📥 DADOS RECEBIDOS:", dados)
-
-        # Verificar se existe o PDF template
-        pdf_path = os.path.join(os.path.dirname(__file__), "malote.pdf")
         
-        if not os.path.exists(pdf_path):
-            return jsonify({"erro": "Arquivo malote.pdf não encontrado no servidor"}), 404
-
-        # Criar overlay com os dados
-        packet = io.BytesIO()
-        c = canvas.Canvas(packet, pagesize=A4)
-        width, height = A4
-
-        # ======================================
-        # POSIÇÕES CALIBRADAS PARA O SEU PDF (VERSÃO FINAL)
-        # ======================================
-
-        # --- CABEÇALHO ---
-        x_remetente = 4.1*cm      
-        y_remetente = height - 3.25*cm   # Linha exata do "REMETENTE: ______"
-
-        x_lacre = 4.1*cm          
-        y_lacre = height - 3.55*cm       # Linha exata do "Nº LACRE: ______"
-
-        # --- TABELA DE ATENDIMENTOS ---
-        # (alinhamento testado com o PDF que você gerou)
-        y_primeira_linha = height - 7.65*cm   # primeira linha real da tabela
-        espaco_entre_linhas = 0.74*cm         # altura real das linhas do formulário
-
-        # --- COLUNAS (alinhadas com seu layout) ---
-        x_atendimento = 1.55*cm      # coluna "ATENDIMENTO"
-        x_valor = 6.05*cm            # coluna "VALOR"
-        x_checkbox_cartao = 11.12*cm # centro do (   ) CARTÃO
-        x_checkbox_especie = 14.72*cm# centro do (   ) ESPÉCIE
-
-        # --- OBSERVAÇÕES ---
-        x_obs = 1.6*cm
-        y_obs = 4.95*cm
-        
-        # ======================================
-        # PREENCHER DADOS
-        # ======================================
-        
-        # REMETENTE
-        c.setFont("Helvetica", 11)
-        c.drawString(x_remetente, y_remetente, dados.get("REMETENTE", ""))
-        
-        # Nº LACRE
-        c.drawString(x_lacre, y_lacre, dados.get("N LACRE", ""))
-        
-        # ATENDIMENTOS
-        c.setFont("Helvetica", 10)
-        
-        for i in range(1, 19):  # Até 18 atendimentos
-            atendimento_key = f"ATENDIMENTORow{i}"
-            valor_key = f"VALORRow{i}"
-            
-            # Calcular posição Y desta linha
-            y_linha = y_primeira_linha - ((i - 1) * espaco_entre_linhas)
-            
-            if atendimento_key in dados:
-                # Número do atendimento
-                c.drawString(x_atendimento, y_linha, dados.get(atendimento_key, ""))
-                
-                # Valor (remover "R$ " se já vier no dado)
-                valor = dados.get(valor_key, "")
-                c.drawRightString(x_valor + 2.3*cm, y_linha, valor)
-                
-                # Checkboxes - desenhar X quando marcado
-                checkbox_cartao_num = i * 2 - 1
-                checkbox_especie_num = i * 2
-                
-                cartao_marcado = dados.get(f"Check Box{checkbox_cartao_num}") == "On"
-                especie_marcado = dados.get(f"Check Box{checkbox_especie_num}") == "On"
-                
-                c.setLineWidth(2.5)
-                
-                # X para CARTÃO
-                if cartao_marcado:
-                    # Ajustar posição do X dentro do parêntese
-                    x_base = x_checkbox_cartao + 0.1*cm
-                    y_base = y_linha - 0.05*cm
-                    tamanho = 0.3*cm
-                    
-                    c.line(x_base, y_base, x_base + tamanho, y_base + tamanho)
-                    c.line(x_base + tamanho, y_base, x_base, y_base + tamanho)
-                
-                # X para ESPÉCIE
-                if especie_marcado:
-                    x_base = x_checkbox_especie + 0.1*cm
-                    y_base = y_linha - 0.05*cm
-                    tamanho = 0.3*cm
-                    
-                    c.line(x_base, y_base, x_base + tamanho, y_base + tamanho)
-                    c.line(x_base + tamanho, y_base, x_base, y_base + tamanho)
-                
-                c.setLineWidth(1)
-
-        # OBSERVAÇÕES
-        c.setFont("Helvetica", 9)
-        observacao = dados.get("OBS:", "")
-        
-        if observacao:
-            # Quebrar texto em múltiplas linhas se necessário
-            max_chars = 85
-            palavras = observacao.split()
-            linha_atual = ""
-            y_obs_atual = y_obs
-            
-            for palavra in palavras:
-                teste = linha_atual + (" " + palavra if linha_atual else palavra)
-                if len(teste) <= max_chars:
-                    linha_atual = teste
-                else:
-                    if linha_atual:
-                        c.drawString(x_obs, y_obs_atual, linha_atual)
-                        y_obs_atual -= 0.4*cm
-                    linha_atual = palavra
-            
-            # Última linha
-            if linha_atual:
-                c.drawString(x_obs, y_obs_atual, linha_atual)
-
-        # Finalizar overlay
-        c.save()
-        packet.seek(0)
-
-        # ======================================
-        # MESCLAR COM PDF ORIGINAL
-        # ======================================
+        # Verificar se o arquivo PDF existe
+        if not os.path.exists(PDF_TEMPLATE):
+            return jsonify({"erro": "Arquivo PDF template não encontrado"}), 500
         
         # Ler o PDF template
-        template_pdf = PdfReader(pdf_path)
-        overlay_pdf = PdfReader(packet)
+        reader = PdfReader(PDF_TEMPLATE)
+        writer = PdfWriter()
+        writer.append(reader)
         
-        # Criar PDF de saída
-        output = PdfWriter()
-        
-        # Mesclar overlay sobre o template
-        page = template_pdf.pages[0]
-        page.merge_page(overlay_pdf.pages[0])
-        output.add_page(page)
-        
-        # Gerar arquivo final
-        output_buffer = io.BytesIO()
-        output.write(output_buffer)
-        output_buffer.seek(0)
-
-        print("✅ PDF gerado com sucesso!")
-
-        return send_file(
-            output_buffer,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name=f"malote_{dados.get('N LACRE', 'protocolo')}.pdf"
+        # Preencher os campos com os dados recebidos
+        writer.update_page_form_field_values(
+            writer.pages[0],
+            dados
         )
-
-    except FileNotFoundError:
-        return jsonify({"erro": "Arquivo malote.pdf não encontrado no servidor. Certifique-se de fazer upload do template."}), 404
+        
+        # Salvar o PDF em memória (usando BytesIO)
+        pdf_buffer = io.BytesIO()
+        writer.write(pdf_buffer)
+        pdf_buffer.seek(0)
+        
+        # Retornar o PDF gerado
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'malote_{dados.get("N_LACRE", "sem_lacre")}.pdf'
+        )
+        
     except Exception as e:
-        print("❌ ERRO:", traceback.format_exc())
+        print(f"Erro ao gerar PDF: {str(e)}")
         return jsonify({"erro": str(e)}), 500
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == '__main__':
+    # Para produção no Render
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
