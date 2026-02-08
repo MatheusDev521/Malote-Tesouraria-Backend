@@ -53,11 +53,11 @@ def preencher_malote_api():
         
         # Campos superiores (REMETENTE e Nº LACRE)
         # Baseado na estrutura típica do formulário
-        x_remetente = 3.8*cm      # Após "REMETENTE:"
-        y_remetente = height - 3.5*cm
+        x_remetente = 4*cm      # Após "REMETENTE:"
+        y_remetente = height - 2.5*cm
         
-        x_lacre = 3.3*cm          # Após "Nº LACRE:"
-        y_lacre = height - 4.2*cm
+        x_lacre = 4*cm          # Após "Nº LACRE:"
+        y_lacre = height - 2.2*cm
         
         # Tabela de atendimentos
         # Começa após o cabeçalho da tabela
