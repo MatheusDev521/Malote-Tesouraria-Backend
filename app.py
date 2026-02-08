@@ -48,31 +48,30 @@ def preencher_malote_api():
         width, height = A4
 
         # ======================================
-        # POSIÇÕES AJUSTADAS PARA O PDF DE MALOTE
+        # POSIÇÕES CALIBRADAS PARA O SEU PDF (VERSÃO FINAL)
         # ======================================
-        
-        # Campos superiores (REMETENTE e Nº LACRE)
-        # Baseado na estrutura típica do formulário
-        x_remetente = 4*cm      # Após "REMETENTE:"
-        y_remetente = height - 2.5*cm
-        
-        x_lacre = 4*cm          # Após "Nº LACRE:"
-        y_lacre = height - 2.2*cm
-        
-        # Tabela de atendimentos
-        # Começa após o cabeçalho da tabela
-        y_primeira_linha = height - 6.2*cm
-        espaco_entre_linhas = 0.85*cm
-        
-        # Colunas da tabela
-        x_atendimento = 1.8*cm    # Coluna ATENDIMENTO
-        x_valor = 5.8*cm          # Coluna VALOR
-        x_checkbox_cartao = 10.8*cm   # Checkbox CARTÃO
-        x_checkbox_especie = 14.2*cm  # Checkbox ESPÉCIE
-        
-        # Campo de observação
-        x_obs = 1.5*cm
-        y_obs = 4.8*cm
+
+        # --- CABEÇALHO ---
+        x_remetente = 4.1*cm      
+        y_remetente = height - 3.25*cm   # Linha exata do "REMETENTE: ______"
+
+        x_lacre = 4.1*cm          
+        y_lacre = height - 3.55*cm       # Linha exata do "Nº LACRE: ______"
+
+        # --- TABELA DE ATENDIMENTOS ---
+        # (alinhamento testado com o PDF que você gerou)
+        y_primeira_linha = height - 7.65*cm   # primeira linha real da tabela
+        espaco_entre_linhas = 0.74*cm         # altura real das linhas do formulário
+
+        # --- COLUNAS (alinhadas com seu layout) ---
+        x_atendimento = 1.55*cm      # coluna "ATENDIMENTO"
+        x_valor = 6.05*cm            # coluna "VALOR"
+        x_checkbox_cartao = 11.12*cm # centro do (   ) CARTÃO
+        x_checkbox_especie = 14.72*cm# centro do (   ) ESPÉCIE
+
+        # --- OBSERVAÇÕES ---
+        x_obs = 1.6*cm
+        y_obs = 4.95*cm
         
         # ======================================
         # PREENCHER DADOS
@@ -101,7 +100,7 @@ def preencher_malote_api():
                 
                 # Valor (remover "R$ " se já vier no dado)
                 valor = dados.get(valor_key, "")
-                c.drawString(x_valor, y_linha, valor)
+                c.drawRightString(x_valor + 2.3*cm, y_linha, valor)
                 
                 # Checkboxes - desenhar X quando marcado
                 checkbox_cartao_num = i * 2 - 1
